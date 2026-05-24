@@ -243,3 +243,21 @@ canvas {
     border-bottom: 1px solid var(--line);
   }
 }
+
+.switchLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.switchLine input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.turnToggle.hidden {
+  display: none;
+}

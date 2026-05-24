@@ -30,7 +30,8 @@ const state = {
 const ids = [
   "presetSelect", "vehLength", "vehWidth", "wheelbase", "frontOffset",
   "rmin", "skillMargin", "roadA", "roadB", "branchY", "gridRes", "status",
-  "turnLeft", "turnRight", "entryTop", "entryLeft", "entryRight"
+  "turnLeft", "turnRight", "entryTop", "entryLeft", "entryRight", "flipVertical",
+  "entryTopLabel", "entryLeftLabel", "entryRightLabel", "turnToggle", "turnLeftLabel", "turnRightLabel"
 ];
 
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
@@ -52,10 +53,11 @@ function vehicle() {
 }
 
 function road() {
+  const branchY = num("branchY");
   return {
     verticalWidth: num("roadA"),
     horizontalWidth: num("roadB"),
-    branchY: num("branchY"),
+    branchY: isFlipped() ? -branchY : branchY,
     angle: Math.PI / 2,
     margin: Math.max(0, num("skillMargin") || 0)
   };
@@ -65,9 +67,13 @@ function setStatus(text) {
   el.status.textContent = text;
 }
 
+function isFlipped() {
+  return el.flipVertical.checked;
+}
+
 function selectedDirection() {
   const mode = selectedEntryMode();
-  if (mode === "fromLeft") return "left";
+  if (mode === "fromLeft") return isFlipped() ? "right" : "left";
   if (mode === "fromRight") return "right";
   return el.turnRight.checked ? "right" : "left";
 }
@@ -83,9 +89,9 @@ function oppositeDirection(dir) {
 }
 
 function modeLabel(mode) {
-  if (mode === "fromLeft") return "左から進入して左折";
+  if (mode === "fromLeft") return isFlipped() ? "左から進入して右折" : "左から進入して左折";
   if (mode === "fromRight") return "右から進入して右折";
-  return "上から進入";
+  return isFlipped() ? "下から進入" : "上から進入";
 }
 
 function worldToCanvas(x, y) {
@@ -253,8 +259,7 @@ function appendExitStraight(traj, pose, distance) {
 }
 
 function planFromTurnPoint(x, y, dir = selectedDirection(), mode = selectedEntryMode()) {
-  if (mode === "fromLeft") return planSideFromTurnPoint(x, y, "fromLeft");
-  if (mode === "fromRight") return planSideFromTurnPoint(x, y, "fromRight");
+  if (mode === "fromLeft" || mode === "fromRight") return planSideFromTurnPoint(x, y, mode);
   return planTopFromTurnPoint(x, y, dir);
 }
 
@@ -262,24 +267,33 @@ function planTopFromTurnPoint(x, y, dir) {
   const r = road();
   const v = vehicle();
   const b = verticalRoadBasis();
+  const flipped = isFlipped();
   const clicked = verticalRoadCoords(x, y);
   const laneN = Math.max(
     -r.verticalWidth / 2 + v.width / 2 + r.margin,
     Math.min(r.verticalWidth / 2 - v.width / 2 - r.margin, clicked.n)
   );
-  const startT = b.tMin + (v.length - v.frontOffset) + r.margin + 0.35;
-  const turnT = Math.max(startT + 0.2, Math.min(r.horizontalWidth / 2 - v.width / 2, clicked.t));
+  const approachHeading = flipped ? r.angle - Math.PI : r.angle;
+  const startT = flipped
+    ? b.tMax - (v.length - v.frontOffset) - r.margin - 0.35
+    : b.tMin + (v.length - v.frontOffset) + r.margin + 0.35;
+  const edgeT = flipped
+    ? -r.horizontalWidth / 2 + v.width / 2 + r.margin
+    : r.horizontalWidth / 2 - v.width / 2 - r.margin;
+  const turnT = flipped
+    ? Math.min(startT - 0.2, Math.max(edgeT, clicked.t))
+    : Math.max(startT + 0.2, Math.min(edgeT, clicked.t));
   const turnPoint = verticalRoadPoint(turnT, laneN);
   const deltaMax = Math.atan(v.wheelbase / v.rmin);
   const sign = dir === "left" ? -1 : 1;
-  const target = dir === "left" ? r.angle - Math.PI / 2 : r.angle + Math.PI / 2;
+  const target = dir === "left" ? approachHeading - Math.PI / 2 : approachHeading + Math.PI / 2;
   const traj = [];
-  let startPoint = verticalRoadPoint(startT, laneN);
-  let pose = samplePose(startPoint.x, startPoint.y, r.angle);
+  const startPoint = verticalRoadPoint(startT, laneN);
+  let pose = samplePose(startPoint.x, startPoint.y, approachHeading);
 
-  let straight = appendStraight(traj, pose, turnT - startT, true);
+  let straight = appendStraight(traj, pose, Math.abs(turnT - startT), true);
   if (!straight.ok) return { ok: false, traj, delta: sign * deltaMax, x: turnPoint.x, y: turnPoint.y, dir, mode: "top", reason: "approach-collision" };
-  pose = samplePose(turnPoint.x, turnPoint.y, r.angle);
+  pose = samplePose(turnPoint.x, turnPoint.y, approachHeading);
 
   let guard = 0;
   while (guard < 520 && Math.abs(normalizeAngle(pose.theta - target)) > 0.018) {
@@ -297,9 +311,13 @@ function planTopFromTurnPoint(x, y, dir) {
 function planSideFromTurnPoint(x, y, mode) {
   const r = road();
   const v = vehicle();
-  const dir = mode === "fromLeft" ? "left" : "right";
+  const flipped = isFlipped();
+  const dir = mode === "fromLeft" && !flipped ? "left" : "right";
   const heading = mode === "fromLeft" ? 0 : Math.PI;
-  const sign = mode === "fromLeft" ? -1 : 1;
+  const sign = flipped
+    ? (mode === "fromLeft" ? 1 : -1)
+    : (mode === "fromLeft" ? -1 : 1);
+  const target = flipped ? r.angle : r.angle - Math.PI;
   const startX = mode === "fromLeft"
     ? -SIDE_EXTENT + (v.length - v.frontOffset) + r.margin + 0.35
     : SIDE_EXTENT - (v.length - v.frontOffset) - r.margin - 0.35;
@@ -311,7 +329,6 @@ function planSideFromTurnPoint(x, y, mode) {
   const maxTurnX = r.verticalWidth / 2 + 3.0;
   const turnX = Math.max(minTurnX, Math.min(maxTurnX, x));
   const deltaMax = Math.atan(v.wheelbase / v.rmin);
-  const target = r.angle - Math.PI;
   const traj = [];
   let pose = samplePose(startX, laneY, heading);
 
@@ -333,8 +350,10 @@ function planSideFromTurnPoint(x, y, mode) {
 }
 
 function classifyTurnPoint(x, y, mode = selectedEntryMode()) {
-  if (mode === "fromLeft") return planFromTurnPoint(x, y, "left", mode).ok ? 1 : 0;
-  if (mode === "fromRight") return planFromTurnPoint(x, y, "right", mode).ok ? 2 : 0;
+  if (mode !== "top") {
+    const dir = selectedDirection();
+    return planFromTurnPoint(x, y, dir, mode).ok ? (dir === "left" ? 1 : 2) : 0;
+  }
   const left = planFromTurnPoint(x, y, "left", mode).ok;
   const right = planFromTurnPoint(x, y, "right", mode).ok;
   return (left ? 1 : 0) | (right ? 2 : 0);
@@ -350,10 +369,15 @@ function computeStartGrid() {
   const selected = selectedDirection();
   const opposite = oppositeDirection(selected);
   const b = verticalRoadBasis();
+  const flipped = isFlipped();
   let startN = -r.verticalWidth / 2 + v.width / 2 + r.margin;
   let endN = r.verticalWidth / 2 - v.width / 2 - r.margin;
-  let startT = b.tMin + (v.length - v.frontOffset) + r.margin + 0.65;
-  let endT = r.horizontalWidth / 2 - v.width / 2 - r.margin;
+  let startT = flipped
+    ? -r.horizontalWidth / 2 + v.width / 2 + r.margin
+    : b.tMin + (v.length - v.frontOffset) + r.margin + 0.65;
+  let endT = flipped
+    ? b.tMax - (v.length - v.frontOffset) - r.margin - 0.65
+    : r.horizontalWidth / 2 - v.width / 2 - r.margin;
   let xmin = startN;
   let xmax = endN;
   let ymin = startT;
@@ -383,9 +407,7 @@ function computeStartGrid() {
       if (mask & 1) left += 1;
       if (mask & 2) right += 1;
       if (mask === 3) both += 1;
-      const selectedOk = selected === "left" ? Boolean(mask & 1) : Boolean(mask & 2);
-      const oppositeOk = opposite === "left" ? Boolean(mask & 1) : Boolean(mask & 2);
-      cells.push({ x, y, mask, selectedOk, oppositeOk });
+      cells.push({ x, y, mask });
     }
   }
 
@@ -441,16 +463,18 @@ function playSample() {
   const r = road();
   const dir = selectedDirection();
   const mode = selectedEntryMode();
+  const flipped = isFlipped();
+  const sideSampleY = r.branchY + (flipped ? -1 : 1) * r.horizontalWidth * 0.175;
   if (mode === "fromLeft") {
-    animate(planFromTurnPoint(-r.verticalWidth / 2 - 0.5, r.branchY + r.horizontalWidth * 0.175, dir, mode));
+    animate(planFromTurnPoint(-r.verticalWidth / 2 - 0.5, sideSampleY, dir, mode));
     return;
   }
   if (mode === "fromRight") {
-    animate(planFromTurnPoint(r.verticalWidth / 2 + 0.5, r.branchY + r.horizontalWidth * 0.175, dir, mode));
+    animate(planFromTurnPoint(r.verticalWidth / 2 + 0.5, sideSampleY, dir, mode));
     return;
   }
-  const x = (dir === "left" ? -1 : 1) * Math.min(0.9, r.verticalWidth / 4);
-  const y = r.branchY - r.horizontalWidth / 2 - 0.6;
+  const x = (dir === "left" ? (flipped ? 1 : -1) : (flipped ? -1 : 1)) * Math.min(0.9, r.verticalWidth / 4);
+  const y = r.branchY + (flipped ? 1 : -1) * (r.horizontalWidth / 2 + 0.6);
   animate(planFromTurnPoint(x, y, dir, mode));
 }
 
@@ -584,9 +608,13 @@ function drawWorldLine(x1, y1, x2, y2) {
 function drawOverlay() {
   if (!state.overlay) return;
   const { cells, res } = state.overlay;
+  const selected = selectedDirection();
+  const opposite = oppositeDirection(selected);
   for (const cell of cells) {
-    if (cell.selectedOk) ctx.fillStyle = "rgba(82, 151, 89, 0.45)";
-    else if (cell.oppositeOk) ctx.fillStyle = "rgba(222, 149, 54, 0.40)";
+    const selectedOk = selected === "left" ? Boolean(cell.mask & 1) : Boolean(cell.mask & 2);
+    const oppositeOk = opposite === "left" ? Boolean(cell.mask & 1) : Boolean(cell.mask & 2);
+    if (selectedOk) ctx.fillStyle = "rgba(82, 151, 89, 0.45)";
+    else if (oppositeOk) ctx.fillStyle = "rgba(222, 149, 54, 0.40)";
     else ctx.fillStyle = "rgba(207, 76, 63, 0.34)";
     const [x, y] = worldToCanvas(cell.x, cell.y);
     ctx.beginPath();
@@ -658,9 +686,12 @@ function drawPreviewCar() {
     pose = samplePose(startX, r.branchY, Math.PI);
   } else {
     const b = verticalRoadBasis();
-    const startT = b.tMin + (v.length - v.frontOffset) + r.margin + 0.35;
+    const flipped = isFlipped();
+    const startT = flipped
+      ? b.tMax - (v.length - v.frontOffset) - r.margin - 0.35
+      : b.tMin + (v.length - v.frontOffset) + r.margin + 0.35;
     const p = verticalRoadPoint(startT, 0);
-    pose = samplePose(p.x, p.y, r.angle);
+    pose = samplePose(p.x, p.y, flipped ? r.angle - Math.PI : r.angle);
   }
   drawCar(pose, "rgba(55, 81, 93, 0.20)", "rgba(45, 63, 72, 0.42)");
 }
@@ -753,10 +784,24 @@ function drawLabels() {
   ctx.fillStyle = "rgba(28, 38, 45, 0.72)";
   ctx.font = "13px system-ui, sans-serif";
   const mode = selectedEntryMode();
-  const label = mode === "fromLeft" ? "左から進入" : mode === "fromRight" ? "右から進入" : "上から進入";
-  ctx.fillText(label, canvas.width / 2 + 12, 46);
+  ctx.fillText(modeLabel(mode), canvas.width / 2 + 12, 46);
   const r = road();
   ctx.fillText("横道路", 26, worldToCanvas(0, r.branchY)[1] - 12);
+}
+
+function updateModeUi() {
+  const flipped = isFlipped();
+  const topMode = selectedEntryMode() === "top";
+  el.entryTopLabel.textContent = flipped ? "下から" : "上から";
+  el.entryLeftLabel.textContent = flipped ? "左から右折" : "左から左折";
+  el.entryRightLabel.textContent = "右から右折";
+  el.turnToggle.classList.toggle("hidden", !topMode);
+
+  const leftFirst = flipped;
+  el.turnLeft.style.order = leftFirst ? "1" : "3";
+  el.turnLeftLabel.style.order = leftFirst ? "2" : "4";
+  el.turnRight.style.order = leftFirst ? "3" : "1";
+  el.turnRightLabel.style.order = leftFirst ? "4" : "2";
 }
 
 function bindInputs() {
@@ -767,18 +812,33 @@ function bindInputs() {
     el[id].addEventListener("input", () => {
       state.overlay = null;
       state.trace = null;
+      state.selectedTurnPoint = null;
       drawScene();
     });
   });
-  [el.turnLeft, el.turnRight, el.entryTop, el.entryLeft, el.entryRight].forEach((radio) => {
+
+  [el.turnLeft, el.turnRight].forEach((radio) => {
     radio.addEventListener("change", () => {
+      state.trace = null;
+      state.selectedTurnPoint = null;
+      updateModeUi();
+      drawScene();
+      setStatus(`${modeLabel(selectedEntryMode())} / ${selectedDirection() === "left" ? "左折" : "右折"}を選択しました。計算済み領域はそのまま使えます。`);
+    });
+  });
+
+  [el.entryTop, el.entryLeft, el.entryRight, el.flipVertical].forEach((control) => {
+    control.addEventListener("change", () => {
       state.overlay = null;
       state.trace = null;
       state.selectedTurnPoint = null;
+      updateModeUi();
       drawScene();
       setStatus(`${modeLabel(selectedEntryMode())}を選択しました。開始可能領域は再計算してください。`);
     });
   });
+
+  updateModeUi();
 }
 
 function applyPreset(preset) {

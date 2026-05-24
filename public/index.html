@@ -42,19 +42,23 @@
 
       <section class="section">
         <h2>操作</h2>
+        <label class="switchLine">
+          <input id="flipVertical" type="checkbox">
+          <span>上下反転</span>
+        </label>
         <div class="modeToggle" role="group" aria-label="進入方向">
           <input id="entryTop" name="entryMode" type="radio" value="top" checked>
-          <label for="entryTop">上から</label>
+          <label id="entryTopLabel" for="entryTop">上から</label>
           <input id="entryLeft" name="entryMode" type="radio" value="fromLeft">
-          <label for="entryLeft">左から左折</label>
+          <label id="entryLeftLabel" for="entryLeft">左から左折</label>
           <input id="entryRight" name="entryMode" type="radio" value="fromRight">
-          <label for="entryRight">右から右折</label>
+          <label id="entryRightLabel" for="entryRight">右から右折</label>
         </div>
-        <div class="turnToggle" role="group" aria-label="曲がる方向">
+        <div id="turnToggle" class="turnToggle" role="group" aria-label="曲がる方向">
           <input id="turnLeft" name="turnDirection" type="radio" value="left" checked>
-          <label for="turnLeft">左折</label>
+          <label id="turnLeftLabel" for="turnLeft">左折</label>
           <input id="turnRight" name="turnDirection" type="radio" value="right">
-          <label for="turnRight">右折</label>
+          <label id="turnRightLabel" for="turnRight">右折</label>
         </div>
         <div class="buttons">
           <button id="computeGrid" type="button">開始可能領域を計算</button>
