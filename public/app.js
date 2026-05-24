@@ -2,9 +2,13 @@
 const ctx = canvas.getContext("2d");
 
 const SCALE = 46;
-const TOP_Y = -7.4;
-const BOTTOM_Y = 8.6;
+const TOP_Y = -7.8;
+const BOTTOM_Y = 7.8;
 const SIDE_EXTENT = 12.8;
+const BRANCH_OFFSET = 4.5;
+const VERTICAL_STEM_LENGTH = 14.9;
+const TURN_GRID_APPROACH = 2.2;
+const TURN_GRID_EXIT = 3.0;
 const DT = 0.035;
 const SPEED = 1.3;
 
@@ -29,7 +33,7 @@ const state = {
 
 const ids = [
   "presetSelect", "vehLength", "vehWidth", "wheelbase", "frontOffset",
-  "rmin", "skillMargin", "roadA", "roadB", "branchY", "gridRes", "status",
+  "rmin", "skillMargin", "roadA", "roadB", "gridRes", "status",
   "turnLeft", "turnRight", "entryTop", "entryLeft", "entryRight", "flipVertical",
   "entryTopLabel", "entryLeftLabel", "entryRightLabel", "turnToggle", "turnLeftLabel", "turnRightLabel"
 ];
@@ -53,11 +57,10 @@ function vehicle() {
 }
 
 function road() {
-  const branchY = num("branchY");
   return {
     verticalWidth: num("roadA"),
     horizontalWidth: num("roadB"),
-    branchY: isFlipped() ? -branchY : branchY,
+    branchY: isFlipped() ? -BRANCH_OFFSET : BRANCH_OFFSET,
     angle: Math.PI / 2,
     margin: Math.max(0, num("skillMargin") || 0)
   };
@@ -110,12 +113,13 @@ function verticalRoadBasis() {
   const r = road();
   const u = { x: Math.cos(r.angle), y: Math.sin(r.angle) };
   const n = { x: -Math.sin(r.angle), y: Math.cos(r.angle) };
+  const flipped = isFlipped();
   return {
     origin: { x: 0, y: r.branchY },
     u,
     n,
-    tMin: TOP_Y - r.branchY,
-    tMax: BOTTOM_Y - r.branchY
+    tMin: flipped ? -r.horizontalWidth / 2 : r.horizontalWidth / 2 - VERTICAL_STEM_LENGTH,
+    tMax: flipped ? -r.horizontalWidth / 2 + VERTICAL_STEM_LENGTH : r.horizontalWidth / 2
   };
 }
 
@@ -373,19 +377,20 @@ function computeStartGrid() {
   let startN = -r.verticalWidth / 2 + v.width / 2 + r.margin;
   let endN = r.verticalWidth / 2 - v.width / 2 - r.margin;
   let startT = flipped
-    ? -r.horizontalWidth / 2 + v.width / 2 + r.margin
-    : b.tMin + (v.length - v.frontOffset) + r.margin + 0.65;
+    ? Math.max(-r.horizontalWidth / 2 + v.width / 2 + r.margin, r.horizontalWidth / 2 - TURN_GRID_EXIT)
+    : Math.max(b.tMin, -r.horizontalWidth / 2 - TURN_GRID_APPROACH);
   let endT = flipped
-    ? b.tMax - (v.length - v.frontOffset) - r.margin - 0.65
-    : r.horizontalWidth / 2 - v.width / 2 - r.margin;
+    ? Math.min(b.tMax, r.horizontalWidth / 2 + TURN_GRID_APPROACH)
+    : Math.min(r.horizontalWidth / 2 - v.width / 2 - r.margin, -r.horizontalWidth / 2 + TURN_GRID_EXIT);
   let xmin = startN;
   let xmax = endN;
   let ymin = startT;
   let ymax = endT;
 
   if (mode !== "top") {
-    xmin = -r.verticalWidth / 2 - 3.0;
-    xmax = r.verticalWidth / 2 + 3.0;
+    const sideReach = r.verticalWidth / 2 + TURN_GRID_EXIT;
+    xmin = mode === "fromLeft" ? -sideReach : 0;
+    xmax = mode === "fromLeft" ? 0 : sideReach;
     ymin = r.branchY - r.horizontalWidth / 2 + v.width / 2 + r.margin;
     ymax = r.branchY + r.horizontalWidth / 2 - v.width / 2 - r.margin;
   }
@@ -784,9 +789,14 @@ function drawLabels() {
   ctx.fillStyle = "rgba(28, 38, 45, 0.72)";
   ctx.font = "13px system-ui, sans-serif";
   const mode = selectedEntryMode();
-  ctx.fillText(modeLabel(mode), canvas.width / 2 + 12, 46);
   const r = road();
-  ctx.fillText("横道路", 26, worldToCanvas(0, r.branchY)[1] - 12);
+  const b = verticalRoadBasis();
+  const top = verticalRoadPoint(b.tMin, 0);
+  const bottom = verticalRoadPoint(b.tMax, 0);
+  const [labelX, labelY] = worldToCanvas(0, isFlipped() ? bottom.y - 0.9 : top.y + 0.9);
+  ctx.fillText(modeLabel(mode), canvas.width / 2 + 12, 46);
+  ctx.fillText(`縦道路幅 ${r.verticalWidth.toFixed(1)} m`, labelX + 12, labelY);
+  ctx.fillText(`横道路幅 ${r.horizontalWidth.toFixed(1)} m`, 26, worldToCanvas(0, r.branchY)[1] - 12);
 }
 
 function updateModeUi() {
@@ -807,7 +817,7 @@ function updateModeUi() {
 function bindInputs() {
   [
     "vehLength", "vehWidth", "wheelbase", "frontOffset", "rmin",
-    "skillMargin", "roadA", "roadB", "branchY", "gridRes"
+    "skillMargin", "roadA", "roadB", "gridRes"
   ].forEach((id) => {
     el[id].addEventListener("input", () => {
       state.overlay = null;
