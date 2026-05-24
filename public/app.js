@@ -427,7 +427,9 @@ function animate(plan) {
 
 function clickCanvas(ev) {
   const rect = canvas.getBoundingClientRect();
-  const [x, y] = canvasToWorld(ev.clientX - rect.left, ev.clientY - rect.top);
+  const canvasX = (ev.clientX - rect.left) * (canvas.width / rect.width);
+  const canvasY = (ev.clientY - rect.top) * (canvas.height / rect.height);
+  const [x, y] = canvasToWorld(canvasX, canvasY);
   if (!isPointInsideRoad(x, y)) {
     setStatus("道路の内側をクリックしてください。");
     return;
