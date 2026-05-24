@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Toyota Yaris",
+    "length_m": 3.94,
+    "width_m": 1.745,
+    "wheelbase_m": 2.56,
+    "front_axle_offset_m": 0.69,
+    "min_turning_radius_m": 5.1,
+    "notes": "Approximate representative value"
+  },
+  {
+    "name": "Toyota Prius",
+    "length_m": 4.54,
+    "width_m": 1.76,
+    "wheelbase_m": 2.785,
+    "front_axle_offset_m": 0.88,
+    "min_turning_radius_m": 5.4,
+    "notes": "Approximate representative value"
+  },
+  {
+    "name": "Toyota Noah",
+    "length_m": 4.695,
+    "width_m": 1.695,
+    "wheelbase_m": 2.85,
+    "front_axle_offset_m": 0.92,
+    "min_turning_radius_m": 5.4,
+    "notes": "Approximate representative value"
+  },
+  {
+    "name": "Toyota Alphard",
+    "length_m": 4.995,
+    "width_m": 1.85,
+    "wheelbase_m": 3.0,
+    "front_axle_offset_m": 0.97,
+    "min_turning_radius_m": 5.9,
+    "notes": "Approximate representative value"
+  },
+  {
+    "name": "Toyota Land Cruiser",
+    "length_m": 4.985,
+    "width_m": 1.98,
+    "wheelbase_m": 2.85,
+    "front_axle_offset_m": 1.07,
+    "min_turning_radius_m": 5.9,
+    "notes": "Approximate representative value"
+  },
+  {
+    "name": "Lexus NX",
+    "length_m": 4.66,
+    "width_m": 1.865,
+    "wheelbase_m": 2.69,
+    "front_axle_offset_m": 0.985,
+    "min_turning_radius_m": 5.6,
+    "notes": "Approximate representative value"
+  },
+  {
+    "name": "Lexus RX",
+    "length_m": 4.89,
+    "width_m": 1.92,
+    "wheelbase_m": 2.85,
+    "front_axle_offset_m": 1.05,
+    "min_turning_radius_m": 5.9,
+    "notes": "Approximate representative value"
+  },
+  {
+    "name": "Lexus LS",
+    "length_m": 5.235,
+    "width_m": 1.9,
+    "wheelbase_m": 3.125,
+    "front_axle_offset_m": 1.055,
+    "min_turning_radius_m": 5.9,
+    "notes": "Approximate representative value"
+  }
+]
